@@ -13,6 +13,7 @@ import codecs
 import os
 import sys
 import threading
+import time
 
 import serial
 from serial.tools.list_ports import comports
@@ -490,7 +491,7 @@ class Miniterm(object):
             pass
         sys.stderr.write('--- software flow control: {}\n'.format('active' if self.serial.xonxoff else 'inactive'))
         sys.stderr.write('--- hardware flow control: {}\n'.format('active' if self.serial.rtscts else 'inactive'))
-        sys.stderr.write('>-- serial input encoding: {}\n'.format(self.input_encoding))
+        sys.stderr.write('--- serial input encoding: {}\n'.format(self.input_encoding))
         sys.stderr.write('--- serial output encoding: {}\n'.format(self.output_encoding))
         sys.stderr.write('--- EOL: {}\n'.format(self.eol.upper()))
         sys.stderr.write('--- filters: {}\n'.format(' '.join(self.filters)))
@@ -500,7 +501,7 @@ class Miniterm(object):
         try:
             while self.alive and self._reader_alive:
                 # read all that is there or wait for one byte
-                data = self.serial.read(self.serial.in_waiting or 1)
+                data = self.serial.read(self.serial.inWaiting())
                 if data:
                     if self.raw:
                         self.console.write_bytes(data)
@@ -509,6 +510,7 @@ class Miniterm(object):
                         for transformation in self.rx_transformations:
                             text = transformation.rx(text)
                         self.console.write(text)
+
         except serial.SerialException:
             self.alive = False
             self.console.cancel()
@@ -524,7 +526,7 @@ class Miniterm(object):
         try:
             while self.alive:
                 try:
-                    c = self.console.getkey()
+                    c = '43 03 01\n'  # fixed RFID command line
                 except KeyboardInterrupt:
                     c = '\x03'
                 if not self.alive:
@@ -543,6 +545,8 @@ class Miniterm(object):
                     for transformation in self.tx_transformations:
                         text = transformation.tx(text)
                     self.serial.write(self.tx_encoder.encode(text))
+                    time.sleep(3)
+
                     if self.echo:
                         echo_text = c
                         for transformation in self.tx_transformations:
