@@ -14,12 +14,14 @@ import os
 import sys
 import threading
 import time
+from datetime import datetime
 
 import serial
 from serial.tools.list_ports import comports
 from serial.tools import hexlify_codec
 
 # pylint: disable=wrong-import-order,wrong-import-position
+from src.report import write_result
 
 codecs.register(lambda c: hexlify_codec.getregentry() if c == 'hexlify' else None)
 
@@ -285,69 +287,6 @@ class NoTerminal(Transform):
     echo = rx
 
 
-class NoControls(NoTerminal):
-    """Remove all control codes, incl. CR+LF"""
-
-    REPLACEMENT_MAP = dict((x, 0x2400 + x) for x in range(32))
-    REPLACEMENT_MAP.update(
-        {
-            0x20: 0x2423,  # visual space
-            0x7F: 0x2421,  # DEL
-            0x9B: 0x2425,  # CSI
-        })
-
-
-class Printable(Transform):
-    """Show decimal code for all non-ASCII characters and replace most control codes"""
-
-    def rx(self, text):
-        r = []
-        for c in text:
-            if ' ' <= c < '\x7f' or c in '\r\n\b\t':
-                r.append(c)
-            elif c < ' ':
-                r.append(unichr(0x2400 + ord(c)))
-            else:
-                r.extend(unichr(0x2080 + ord(d) - 48) for d in '{:d}'.format(ord(c)))
-                r.append(' ')
-        return ''.join(r)
-
-    echo = rx
-
-
-class Colorize(Transform):
-    """Apply different colors for received and echo"""
-
-    def __init__(self):
-        # XXX make it configurable, use colorama?
-        self.input_color = '\x1b[37m'
-        self.echo_color = '\x1b[31m'
-
-    def rx(self, text):
-        return self.input_color + text
-
-    def echo(self, text):
-        return self.echo_color + text
-
-
-class DebugIO(Transform):
-    """Print what is sent and received"""
-
-    def rx(self, text):
-        sys.stderr.write(' [RX:{!r}] '.format(text))
-        sys.stderr.flush()
-        return text
-
-    def tx(self, text):
-        sys.stderr.write(' [TX:{!r}] '.format(text))
-        sys.stderr.flush()
-        return text
-
-
-# other ideas:
-# - add date/time for each newline
-# - insert newline after: a) timeout b) packet end character
-
 EOL_TRANSFORMATIONS = {
     'crlf': CRLF,
     'cr': CR,
@@ -357,10 +296,6 @@ EOL_TRANSFORMATIONS = {
 TRANSFORMATIONS = {
     'direct': Transform,  # no transformation
     'default': NoTerminal,
-    'nocontrol': NoControls,
-    'printable': Printable,
-    'colorize': Colorize,
-    'debug': DebugIO,
 }
 
 
@@ -456,8 +391,7 @@ class Miniterm(object):
 
     def update_transformations(self):
         """take list of transformation classes and instantiate them for rx and tx"""
-        transformations = [EOL_TRANSFORMATIONS[self.eol]] + [TRANSFORMATIONS[f]
-                                                             for f in self.filters]
+        transformations = [EOL_TRANSFORMATIONS[self.eol]] + [TRANSFORMATIONS[f] for f in self.filters]
         self.tx_transformations = [t() for t in transformations]
         self.rx_transformations = list(reversed(self.tx_transformations))
 
@@ -498,6 +432,7 @@ class Miniterm(object):
 
     def reader(self):
         """loop and copy serial->console"""
+        arr_data = bytearray()
         try:
             while self.alive and self._reader_alive:
                 # read all that is there or wait for one byte
@@ -506,10 +441,22 @@ class Miniterm(object):
                     if self.raw:
                         self.console.write_bytes(data)
                     else:
-                        text = self.rx_decoder.decode(data)
-                        for transformation in self.rx_transformations:
-                            text = transformation.rx(text)
-                        self.console.write(text)
+                        arr_data.extend(data)
+                        print('len' + str(len(arr_data)))
+                        if len(arr_data) == 5 and arr_data == b'\x44\x05\x00\x00\x00':
+                            write_result(arr_data, datetime.now())
+                            print('not found and clear data')
+                            arr_data = bytearray()
+                        elif len(arr_data) == 22:
+                            write_result(arr_data, datetime.now())
+                            print(arr_data)
+                            print('clear data')
+                            arr_data = bytearray()
+
+                        # text = self.rx_decoder.decode(data)
+                        # for transformation in self.rx_transformations:
+                        #     text = transformation.rx(text)
+                        # self.console.write(text)
 
         except serial.SerialException:
             self.alive = False
