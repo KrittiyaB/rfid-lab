@@ -199,7 +199,7 @@ elif os.name == 'posix':
 
     class Console(ConsoleBase):
         def __init__(self):
-            super(Console, self).__init__()
+            # super(Console, self).__init__()
             self.fd = sys.stdin.fileno()
             self.old = termios.tcgetattr(self.fd)
             atexit.register(self.cleanup)
@@ -332,7 +332,7 @@ class Miniterm(object):
     """
 
     def __init__(self, serial_instance, echo=False, eol='crlf', filters=()):
-        self.console = Console()
+        # self.console = Console()
         self.serial = serial_instance
         self.echo = echo
         self.raw = False
@@ -372,7 +372,7 @@ class Miniterm(object):
         self.transmitter_thread = threading.Thread(target=self.writer, name='tx')
         self.transmitter_thread.daemon = True
         self.transmitter_thread.start()
-        self.console.setup()
+        # self.console.setup()
 
     def stop(self):
         """set flag to stop worker threads"""
@@ -442,14 +442,14 @@ class Miniterm(object):
                         self.console.write_bytes(data)
                     else:
                         arr_data.extend(data)
-                        print('len' + str(len(arr_data)))
+                        # print('len' + str(len(arr_data)))
                         if len(arr_data) == 5 and arr_data == b'\x44\x05\x00\x00\x00':
                             write_result(arr_data, datetime.now())
-                            print('not found and clear data')
+                            print('not found and clear data', arr_data.hex())
                             arr_data = bytearray()
                         elif len(arr_data) == 22:
                             write_result(arr_data, datetime.now())
-                            print(arr_data)
+                            print(arr_data.hex())
                             print('clear data')
                             arr_data = bytearray()
 
