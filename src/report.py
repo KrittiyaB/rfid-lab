@@ -52,13 +52,13 @@ def rssi_to_dec():
     df = pd.read_csv('../data/rssi.csv')
     # print(df.head(10))
     new_df = pd.DataFrame(columns=['RSSI Dec'])
-    df['RSSI Hex'] = df['RSSI Hex'].fillna(0)
-    df['RSSI Hex'] = df['RSSI Hex'].astype('str')
+    df['Frequency'] = df['Frequency'].fillna(0)
+    df['Frequency'] = df['Frequency'].astype('str')
 
     # print(df.dtypes)
     for index, row in df.iterrows():
-        new_df.at[index, 'RSSI Dec'] = int(row['RSSI Hex'], 16)
-    new_df.to_csv('../src/converted_rssi.csv', index=False)
+        new_df.at[index, 'FREQUENCY'] = int(row['Frequency'], 16)
+    new_df.to_csv('../data/converted_rssi.csv', index=False)
 
 
 if __name__ == '__main__':
