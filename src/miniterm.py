@@ -17,11 +17,13 @@ import time
 from datetime import datetime
 
 import serial
-from serial.tools.list_ports import comports
 from serial.tools import hexlify_codec
+from serial.tools.list_ports import comports
 
 # pylint: disable=wrong-import-order,wrong-import-position
 from src.report import write_result
+
+COUNT = 0
 
 codecs.register(lambda c: hexlify_codec.getregentry() if c == 'hexlify' else None)
 
@@ -432,6 +434,7 @@ class Miniterm(object):
 
     def reader(self):
         """loop and copy serial->console"""
+        global COUNT
         arr_data = bytearray()
         try:
             while self.alive and self._reader_alive:
@@ -441,18 +444,25 @@ class Miniterm(object):
                     if self.raw:
                         self.console.write_bytes(data)
                     else:
+                        global COUNT
                         arr_data.extend(data)
                         # print('len' + str(len(arr_data)))
                         if len(arr_data) == 5 and arr_data == b'\x44\x05\x00\x00\x00':
+                            counter()
                             write_result(arr_data, datetime.now())
-                            print('not found and clear data', arr_data.hex())
+                            print('>> ' + str(COUNT) + ' : not found', arr_data.hex())
+                            print('clear data')
                             arr_data = bytearray()
                         elif len(arr_data) == 22:
+                            counter()
                             write_result(arr_data, datetime.now())
-                            print(arr_data.hex())
+                            print('>> ' + str(COUNT) + ' : ' + arr_data.hex())
                             print('clear data')
                             arr_data = bytearray()
 
+                        if COUNT == 5:
+                            COUNT = 0
+                            print("--------------------------------------------\n")
                         # text = self.rx_decoder.decode(data)
                         # for transformation in self.rx_transformations:
                         #     text = transformation.rx(text)
@@ -492,7 +502,7 @@ class Miniterm(object):
                     for transformation in self.tx_transformations:
                         text = transformation.tx(text)
                     self.serial.write(self.tx_encoder.encode(text))
-                    time.sleep(3)
+                    time.sleep(1)
 
                     if self.echo:
                         echo_text = c
@@ -991,6 +1001,11 @@ def main(default_port=None, default_baudrate=9600, default_rts=None, default_dtr
         sys.stderr.write('\n--- exit ---\n')
     miniterm.join()
     miniterm.close()
+
+
+def counter():
+    global COUNT
+    COUNT = COUNT + 1
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
